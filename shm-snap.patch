@@ -1,56 +1,71 @@
-diff --git a/sysdeps/unix/sysv/linux/shm-directory.c b/sysdeps/unix/sysv/linux/shm-directory.c
-index 222b6e6..34a7660 100644
---- a/sysdeps/unix/sysv/linux/shm-directory.c
-+++ b/sysdeps/unix/sysv/linux/shm-directory.c
-@@ -58,6 +58,51 @@ where_is_shmfs (void)
-                                          || f.f_type == RAMFS_MAGIC))
-     {
-       /* It is in the normal place.  */
-+      /* check if this is snappy system, and we should use sub dir */
-+      const char *snap_sub_dir = getenv ("SNAP_SHM_SUB_DIR");
-+      if (snap_sub_dir != NULL)
-+      {
-+        /* make sure sub dir exists and is usable */
-+        mountpoint.dir = (char *) malloc (sizeof (defaultdir) + 1 + strlen(snap_sub_dir));
-+        if (mountpoint.dir != NULL)
-+          {
-+            char *cp = __mempcpy (mountpoint.dir, defaultdir, strlen(defaultdir));
-+            if (cp[-1] != '/')
-+              *cp++ = '/';
-+            cp = __mempcpy (cp, snap_sub_dir , strlen(snap_sub_dir));
-+            if (cp[-1] != '/')
-+              *cp++ = '/';
-+            *cp = '\0';
-+            mountpoint.dirlen = cp - mountpoint.dir;
-+            /* make sure directory exists */
-+            int st = mkdir(mountpoint.dir, 0777);
-+            if (st == 0 || st == EEXIST)
-+            {
-+              return;
-+            }
-+            else
-+            {
-+              free (mountpoint.dir);
-+              mountpoint.dir = NULL;
-+            }
-+          }
-+      }
-+      const char *snap_prefix = getenv ("SNAP_SHM_PREFIX");
-+      if (snap_prefix != NULL)
-+      {
-+        mountpoint.dir = (char *) malloc (sizeof (defaultdir) + 1 + strlen(snap_prefix));
-+        if (mountpoint.dir != NULL)
-+          {
-+            char *cp = __mempcpy (mountpoint.dir, defaultdir, strlen(defaultdir));
-+            if (cp[-1] != '/')
-+              *cp++ = '/';
-+            cp = __mempcpy (cp, snap_prefix , strlen(snap_prefix));
-+            *cp = '\0';
-+            mountpoint.dirlen = cp - mountpoint.dir;
-+
-+            return;
-+        }
-+      }
-       mountpoint.dir = (char *) defaultdir;
-       mountpoint.dirlen = sizeof (defaultdir) - 1;
+From 3ff8053428290bd960484addd95990d075638620 Mon Sep 17 00:00:00 2001
+From: Ondrej Kubik <ondrej.kubik@canonical.com>
+Date: Fri, 28 Apr 2023 14:31:52 +0200
+Subject: [PATCH] posix: add support for SNAP_SHM_SUB_DIR and SNAP_SHM_PREFIX
+ when getting SHMDIR
+
+Signed-off-by: Ondrej Kubik <ondrej.kubik@canonical.com>
+---
+ posix/shm-directory.c | 31 +++++++++++++++++++++++++++++++
+ 1 file changed, 31 insertions(+)
+
+diff --git a/posix/shm-directory.c b/posix/shm-directory.c
+index 76ea825be..b72169dad 100644
+--- a/posix/shm-directory.c
++++ b/posix/shm-directory.c
+@@ -21,9 +21,12 @@
+ #if _POSIX_MAPPED_FILES
  
+ #include <alloc_buffer.h>
++#include <errno.h>
+ #include <shm-directory.h>
+ #include <string.h>
+ 
++int check_for_snap_prefix(struct shmdir_name *result, struct alloc_buffer *buf);
++
+ int
+ __shm_get_name (struct shmdir_name *result, const char *name, bool sem_prefix)
+ {
+@@ -34,6 +37,8 @@ __shm_get_name (struct shmdir_name *result, const char *name, bool sem_prefix)
+   struct alloc_buffer buffer
+     = alloc_buffer_create (result->name, sizeof (result->name));
+   alloc_buffer_copy_bytes (&buffer, SHMDIR, strlen (SHMDIR));
++  if (check_for_snap_prefix(result, &buffer))
++    return -1;
+   if (sem_prefix)
+     alloc_buffer_copy_bytes (&buffer, "sem.", strlen ("sem."));
+   alloc_buffer_copy_bytes (&buffer, name, namelen + 1);
+@@ -44,4 +49,30 @@ __shm_get_name (struct shmdir_name *result, const char *name, bool sem_prefix)
+ }
+ libc_hidden_def (__shm_get_name)
+ 
++int
++check_for_snap_prefix(struct shmdir_name *result, struct alloc_buffer *buf)
++{
++  /* check if this is snappy system, and we should use sub dir */
++  const char *snap_sub_dir = getenv ("SNAP_SHM_SUB_DIR");
++  if (snap_sub_dir != NULL)
++  {
++    alloc_buffer_copy_bytes(buf, snap_sub_dir, strlen(snap_sub_dir));
++    alloc_buffer_copy_bytes(buf, "/", strlen("/"));
++    /* make sure directory exists */
++    int st = mkdir(result->name, 0777);
++    if (st == 0 || st == EEXIST)
++    {
++      return 0;
++    } else {
++      return st;
++    }
++  }
++  const char *snap_prefix = getenv ("SNAP_SHM_PREFIX");
++  if (snap_prefix != NULL)
++  {
++    alloc_buffer_copy_bytes(buf, snap_prefix, strlen(snap_prefix));
++  }
++  return 0;
++}
++
+ #endif
+-- 
+2.39.0
+
