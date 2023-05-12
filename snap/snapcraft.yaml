@@ -24,7 +24,7 @@ parts:
       - libc6
     override-pull: |
       craftctl default
-      craftctl set version=$(git describe 2>/dev/null | awk -F '/' '{print $3}')
+      craftctl set version=$(head -n 1  debian/changelog | sed 's/.*(\(.*\)).*/\1/')
       quilt push -afq --leave-rejects --quiltrc=${CRAFT_PROJECT_DIR}/quiltrc
       git apply ${CRAFT_PROJECT_DIR}/shm-snap.patch
     override-build: |
