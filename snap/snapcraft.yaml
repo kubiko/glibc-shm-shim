@@ -23,22 +23,11 @@ parts:
         override-pull: |
             craftctl default
             craftctl set version=$(git describe 2>/dev/null | awk -F '/' '{print $3}')
-            rm -rf manual
             quilt push -afq --leave-rejects --quiltrc=${CRAFT_PROJECT_DIR}/quiltrc
-            sed -i -e 's|curpass =.*|curpass = "libc"|g' \
-                   -e 's|build-arch: $(stamp)build_C.UTF-8 |# build-arch: $(stamp)build_C.UTF-8|g' \
-                   -e 's|$(stamp)build_locales-all|# $(stamp)build_locales-all|g' \
-                   debian/rules
             git apply ${CRAFT_PROJECT_DIR}/shm-snap.patch
         override-build: |
-            sed -i 's|$(CURDIR)/debian/tmp-$(curpass)|'"${CRAFT_PART_BUILD}"'|g' debian/rules.d/build.mk
-            mkdir -p etc
-            cp debian/local/etc/ld.so.conf etc/
-            unset LD_LIBRARY_PATH
-            DEB_BUILD_PROFILES='stage0' DEB_BUILD_OPTIONS='nocheck parallel=$(nproc)' debian/rules build-arch
-            cd build-tree/*-libc
-            make install -j$(nproc)
-            cd ../../
+            DEB_BUILD_OPTIONS=nocheck debuild -b -uc -us
+            cd debian/tmp-libc
             find lib -name 'libpthread*.so*' -exec cp --parents \{\} ${CRAFT_PART_INSTALL} \;
         build-attributes:
             - no-patchelf
@@ -54,13 +43,20 @@ parts:
              - -*
 
 build-packages:
+    - bison
+    - debhelper
+    - devscripts
+    - gawk
+    - gperf
+    - g++
+    - libaudit-dev
+    - libcap-dev
+    - libgd-dev
+    - libselinux-dev
+    - quilt
     - rdfind
     - symlinks
     - systemtap-sdt-dev
-    - libaudit-dev
-    - g++
     - wget
-    - quilt
-    - gawk
-    - debhelper
-    - bison
+    - on amd64:
+        - g++-multilib
