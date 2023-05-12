@@ -1,56 +1,56 @@
 name: libc-shm-shim
 summary: glibc snap shim to redirect used sharem memory into snap permited path
 description: |
-   glibc snap shim to redirect used sharem memory into snap permited path
+  glibc snap shim to redirect used sharem memory into snap permited path
 
 confinement: strict
 grade: stable
 adopt-info: libpthread
 architectures:
-    - build-on: armhf
-    - build-on: arm64
-    - build-on: amd64
+  - build-on: armhf
+  - build-on: arm64
+  - build-on: amd64
 
 base: core22
 
 parts:
-    libpthread:
-        plugin: nil
-        source: https://git.launchpad.net/ubuntu/+source/glibc
-        source-branch: ubuntu/jammy-updates
-        source-depth: 10
-        source-type: git
-        stage-packages:
-            - libc6
-        override-pull: |
-            craftctl default
-            craftctl set version=$(git describe 2>/dev/null | awk -F '/' '{print $3}')
-            quilt push -afq --leave-rejects --quiltrc=${CRAFT_PROJECT_DIR}/quiltrc
-            git apply ${CRAFT_PROJECT_DIR}/shm-snap.patch
-        override-build: |
-            DEB_BUILD_OPTIONS=nocheck debuild -b -uc -us
-            cd debian/tmp-libc
-            find lib -name 'libpthread*.so*' -exec cp --parents \{\} ${CRAFT_PART_INSTALL} \;
-        build-attributes:
-            - no-patchelf
-        stage:
-            - */*/libpthread*.so*
+  libpthread:
+    plugin: nil
+    source: https://git.launchpad.net/ubuntu/+source/glibc
+    source-branch: ubuntu/jammy-updates
+    source-depth: 10
+    source-type: git
+    stage-packages:
+      - libc6
+    override-pull: |
+      craftctl default
+      craftctl set version=$(git describe 2>/dev/null | awk -F '/' '{print $3}')
+      quilt push -afq --leave-rejects --quiltrc=${CRAFT_PROJECT_DIR}/quiltrc
+      git apply ${CRAFT_PROJECT_DIR}/shm-snap.patch
+    override-build: |
+      DEB_BUILD_OPTIONS=nocheck debuild -b -uc -us
+      cd debian/tmp-libc
+      find lib -name 'libpthread*.so*' -exec cp --parents \{\} ${CRAFT_PART_INSTALL} \;
+    build-attributes:
+      - no-patchelf
+    stage:
+      - */*/libpthread*.so*
 
 build-packages:
-    - bison
-    - debhelper
-    - devscripts
-    - gawk
-    - gperf
-    - g++
-    - libaudit-dev
-    - libcap-dev
-    - libgd-dev
-    - libselinux-dev
-    - quilt
-    - rdfind
-    - symlinks
-    - systemtap-sdt-dev
-    - wget
-    - on amd64:
-        - g++-multilib
+  - bison
+  - debhelper
+  - devscripts
+  - gawk
+  - gperf
+  - g++
+  - libaudit-dev
+  - libcap-dev
+  - libgd-dev
+  - libselinux-dev
+  - quilt
+  - rdfind
+  - symlinks
+  - systemtap-sdt-dev
+  - wget
+  - on amd64:
+    - g++-multilib
