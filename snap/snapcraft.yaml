@@ -5,7 +5,8 @@ description: |
 
 confinement: strict
 grade: stable
-adopt-info: libpthread
+adopt-info: glibc
+
 architectures:
   - build-on: armhf
   - build-on: arm64
@@ -14,7 +15,7 @@ architectures:
 base: core22
 
 parts:
-  libpthread:
+  glibc:
     plugin: nil
     source: https://git.launchpad.net/ubuntu/+source/glibc
     source-branch: ubuntu/jammy-updates
@@ -29,12 +30,13 @@ parts:
       git apply ${CRAFT_PROJECT_DIR}/shm-snap.patch
     override-build: |
       DEB_BUILD_OPTIONS=nocheck debuild -b -uc -us
-      cd debian/tmp-libc
-      find lib -name 'libpthread*.so*' -exec cp --parents \{\} ${CRAFT_PART_INSTALL} \;
+      cp ${CRAFT_PART_BUILD}/debian/tmp-libc/lib/${CRAFT_ARCH_TRIPLET}/libc.so.* \
+         ${CRAFT_PART_INSTALL}/lib/${CRAFT_ARCH_TRIPLET}
+      strip --strip-all ${CRAFT_PART_INSTALL}/lib/${CRAFT_ARCH_TRIPLET}/libc.so.*
     build-attributes:
       - no-patchelf
     stage:
-      - */*/libpthread*.so*
+      - '*/*/libc.so.6'
 
 build-packages:
   - bison
