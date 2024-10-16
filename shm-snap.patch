@@ -1,8 +1,8 @@
-From 3041ee0d1ceaa7b2371a7dcfe4c9fd52a28c6c45 Mon Sep 17 00:00:00 2001
+From 8ef17af0b0e7398ef31664cab47f553e829f8ba3 Mon Sep 17 00:00:00 2001
 From: Ondrej Kubik <ondrej.kubik@canonical.com>
-Date: Tue, 16 May 2023 15:34:27 +0100
-Subject: [PATCH] SHMDIR: add support for SNAP_SHM_SUB_DIR and SNAP_SHM_PREFIX
- when using SHMDIR
+Date: Wed, 16 Oct 2024 17:21:33 +0000
+Subject: [PATCH] add support for SNAP_SHM_SUB_DIR and SNAP_SHM_PREFIX when
+ using SHMDIR
 
 Signed-off-by: Ondrej Kubik <ondrej.kubik@canonical.com>
 ---
@@ -11,10 +11,10 @@ Signed-off-by: Ondrej Kubik <ondrej.kubik@canonical.com>
  2 files changed, 82 insertions(+), 1 deletion(-)
 
 diff --git a/posix/shm-directory.c b/posix/shm-directory.c
-index 76ea825b..4f15c200 100644
+index a14a1f5e..b6b4dbf4 100644
 --- a/posix/shm-directory.c
 +++ b/posix/shm-directory.c
-@@ -21,9 +21,13 @@
+@@ -21,12 +21,16 @@
  #if _POSIX_MAPPED_FILES
  
  #include <alloc_buffer.h>
@@ -22,27 +22,30 @@ index 76ea825b..4f15c200 100644
  #include <shm-directory.h>
 +#include <stdio.h>
  #include <string.h>
+ #include <sys/mman.h>
+ #include <fcntl.h>
+ #include <errno.h>
  
-+int check_for_snap_prefix(struct shmdir_name *result, struct alloc_buffer *buf);
++int __check_for_snap_prefix(struct shmdir_name *result, struct alloc_buffer *buf);
 +
  int
  __shm_get_name (struct shmdir_name *result, const char *name, bool sem_prefix)
  {
-@@ -34,6 +38,8 @@ __shm_get_name (struct shmdir_name *result, const char *name, bool sem_prefix)
-   struct alloc_buffer buffer
-     = alloc_buffer_create (result->name, sizeof (result->name));
-   alloc_buffer_copy_bytes (&buffer, SHMDIR, strlen (SHMDIR));
-+  if (check_for_snap_prefix(result, &buffer))
-+     return -1;
+@@ -52,6 +56,8 @@ __shm_get_name (struct shmdir_name *result, const char *name, bool sem_prefix)
+     ++name;
+   namelen = strlen (name);
+ 
++  if (__check_for_snap_prefix(result, &buffer))
++    return -1;
    if (sem_prefix)
      alloc_buffer_copy_bytes (&buffer, "sem.", strlen ("sem."));
    alloc_buffer_copy_bytes (&buffer, name, namelen + 1);
-@@ -44,4 +50,30 @@ __shm_get_name (struct shmdir_name *result, const char *name, bool sem_prefix)
+@@ -67,4 +73,30 @@ __shm_get_name (struct shmdir_name *result, const char *name, bool sem_prefix)
  }
  libc_hidden_def (__shm_get_name)
  
 +int
-+check_for_snap_prefix(struct shmdir_name *result, struct alloc_buffer *buf)
++__check_for_snap_prefix(struct shmdir_name *result, struct alloc_buffer *buf)
 +{
 +  /* check if this is snappy system, and we should use sub dir */
 +  const char *snap_sub_dir = getenv ("SNAP_SHM_SUB_DIR");
@@ -69,25 +72,25 @@ index 76ea825b..4f15c200 100644
 +
  #endif
 diff --git a/sysdeps/pthread/sem_open.c b/sysdeps/pthread/sem_open.c
-index add01d56..aad88c56 100644
+index e4123615..76722f9a 100644
 --- a/sysdeps/pthread/sem_open.c
 +++ b/sysdeps/pthread/sem_open.c
-@@ -32,6 +32,8 @@
- # define __unlink unlink
- #endif
+@@ -34,6 +34,8 @@
  
-+int set_shmdir_path(char *path);
+ #define SEM_OPEN_FLAGS (O_RDWR | O_NOFOLLOW | O_CLOEXEC)
+ 
++int __set_shmdir_path(char *path);
 +
  sem_t *
  __sem_open (const char *name, int oflag, ...)
  {
-@@ -116,7 +118,12 @@ __sem_open (const char *name, int oflag, ...)
+@@ -118,7 +120,12 @@ __sem_open (const char *name, int oflag, ...)
        memset ((char *) &sem.initsem + sizeof (struct new_sem), '\0',
  	      sizeof (sem_t) - sizeof (struct new_sem));
  
 -      char tmpfname[] = SHMDIR "sem.XXXXXX";
 +      char tmpfname[NAME_MAX];
-+      if (set_shmdir_path(tmpfname)) {
++      if (__set_shmdir_path(tmpfname)) {
 +        __set_errno (EINVAL);
 +        result = SEM_FAILED;
 +        goto out;
@@ -95,13 +98,13 @@ index add01d56..aad88c56 100644
        int retries = 0;
  #define NRETRIES 50
        while (1)
-@@ -225,3 +232,45 @@ compat_symbol (libpthread, __sem_open, sem_open, GLIBC_2_1_1);
+@@ -227,3 +234,45 @@ compat_symbol (libpthread, __sem_open, sem_open, GLIBC_2_1_1);
  #else /* !PTHREAD_IN_LIBC */
  strong_alias (__sem_open, sem_open)
  #endif
 +
 +int
-+set_shmdir_path(char *path)
++__set_shmdir_path(char *path)
 +{
 +  /* check if this is snappy system, and we should use sub dir */
 +  const char *snap_sub_dir = getenv ("SNAP_SHM_SUB_DIR");
@@ -142,5 +145,5 @@ index add01d56..aad88c56 100644
 +  return 0;
 +}
 -- 
-2.34.1
+2.43.0
 

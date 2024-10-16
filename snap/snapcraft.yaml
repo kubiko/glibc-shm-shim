@@ -7,38 +7,38 @@ confinement: strict
 grade: stable
 adopt-info: glibc
 
-architectures:
-  - build-on: armhf
-  - build-on: arm64
-  - build-on: amd64
+platforms:
+  arm64:
+  armhf:
+  amd64:
 
-base: core22
+base: core24
 
 parts:
   glibc:
     plugin: nil
     source: https://git.launchpad.net/ubuntu/+source/glibc
-    source-branch: ubuntu/jammy-updates
+    source-branch: ubuntu/noble-updates
     source-depth: 10
     source-type: git
     stage-packages:
       - libc6
     override-pull: |
       craftctl default
-      craftctl set version=$(head -n 1  debian/changelog | sed 's/.*(\(.*\)).*/\1/')
       quilt push -afq --leave-rejects --quiltrc=${CRAFT_PROJECT_DIR}/quiltrc
       git apply ${CRAFT_PROJECT_DIR}/shm-snap.patch
     override-build: |
-      DEB_BUILD_OPTIONS=nocheck debuild -b -uc -us
-      cp ${CRAFT_PART_BUILD}/debian/tmp-libc/lib/${CRAFT_ARCH_TRIPLET}/libc.so.* \
-         ${CRAFT_PART_INSTALL}/lib/${CRAFT_ARCH_TRIPLET}
-      strip --strip-all ${CRAFT_PART_INSTALL}/lib/${CRAFT_ARCH_TRIPLET}/libc.so.*
+      DEB_BUILD_OPTIONS=nocheck debuild --no-lintian -b -uc -us
+      version=$(head -n 1  debian/changelog | sed 's/.*(\(.*\)).*/\1/')
+      craftctl set version="${version}"
+      dpkg -x  ${CRAFT_PART_BUILD}/../libc6_${version}_${CRAFT_ARCH_BUILD_FOR}.deb ${CRAFT_PART_INSTALL}
     build-attributes:
       - no-patchelf
     stage:
-      - '*/*/libc.so.6'
+      - 'usr/lib/${CRAFT_ARCH_TRIPLET_BUILD_FOR}/libc.so.6'
 
 build-packages:
+  - binutils-for-host
   - bison
   - debhelper
   - devscripts
