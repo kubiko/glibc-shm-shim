@@ -18,7 +18,7 @@ parts:
   glibc:
     plugin: nil
     source: https://git.launchpad.net/ubuntu/+source/glibc
-    source-branch: ubuntu/resolute-updates
+    source-branch: ubuntu/resolute
     source-depth: 10
     source-type: git
     stage-packages:
