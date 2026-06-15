@@ -12,13 +12,13 @@ platforms:
   armhf:
   amd64:
 
-base: core24
+base: core26
 
 parts:
   glibc:
     plugin: nil
     source: https://git.launchpad.net/ubuntu/+source/glibc
-    source-branch: ubuntu/noble-updates
+    source-branch: ubuntu/resolute-updates
     source-depth: 10
     source-type: git
     stage-packages:
@@ -45,6 +45,8 @@ build-packages:
   - gawk
   - gperf
   - g++
+  - g++-for-host
+  - gcc-for-host
   - libaudit-dev
   - libcap-dev
   - libgd-dev
